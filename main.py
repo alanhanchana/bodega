@@ -10,10 +10,10 @@ from telegram.ext import (
     filters,
 )
 
-TOKEN = "8018884231:AAFGOC6U7VVkravO-FxqGeC7fAKbokusokY"
+TOKEN = "YOUR_BOT_TOKEN_HERE"  # 🔒 Replace with your actual token
 
 # Define states
-MENU, OPTION1, OPTION2 = range(3)
+MENU = 0
 
 # Setup logging
 logging.basicConfig(
@@ -21,39 +21,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Persistent keyboard layout
+persistent_menu = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Option 1", callback_data="option1")],
+    [InlineKeyboardButton("Option 2", callback_data="option2")],
+])
 
+# Start command
 async def start(update: Update, context: CallbackContext) -> int:
-    keyboard = [
-        [InlineKeyboardButton("Option 1", callback_data="option1")],
-        [InlineKeyboardButton("Option 2", callback_data="option2")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "Welcome! Please choose an option:", reply_markup=reply_markup
+        "Welcome! Please choose an option:", reply_markup=persistent_menu
     )
     return MENU
 
-
+# Button handler that keeps the menu alive
 async def button(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
-    await query.answer()
+    await query.answer(text=f"You selected {query.data.capitalize()}.", show_alert=False)
+    await query.edit_message_reply_markup(reply_markup=persistent_menu)
+    return MENU
 
-    if query.data == "option1":
-        await query.edit_message_text(text="You selected Option 1.")
-        return OPTION1
-    elif query.data == "option2":
-        await query.edit_message_text(text="You selected Option 2.")
-        return OPTION2
-    else:
-        await query.edit_message_text(text="Unknown option selected.")
-        return MENU
-
-
+# Cancel fallback (if you ever need it)
 async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text("Operation cancelled.")
     return ConversationHandler.END
 
-
+# Entry point
 def main():
     application = (
         ApplicationBuilder()
@@ -64,20 +57,16 @@ def main():
         .build()
     )
 
-    # ConversationHandler to handle the state machine
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             MENU: [CallbackQueryHandler(button)],
-            OPTION1: [MessageHandler(filters.TEXT & ~filters.COMMAND, cancel)],
-            OPTION2: [MessageHandler(filters.TEXT & ~filters.COMMAND, cancel)],
         },
-        fallbacks=[CommandHandler("start", start)],
+        fallbacks=[CommandHandler("cancel", cancel)],
     )
 
     application.add_handler(conv_handler)
     application.run_polling()
-
 
 if __name__ == "__main__":
     main()
